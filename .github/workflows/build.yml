@@ -19,18 +19,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            bc \
-            bison \
-            build-essential \
-            flex \
-            libdw-dev \
-            libelf-dev \
-            libncurses-dev \
-            libssl-dev \
-            pkg-config \
-            python3 \
-            rsync \
-            dwarves
+              bc \
+              bison \
+              build-essential \
+              debhelper-compat \
+              flex \
+              libdw-dev \
+              libelf-dev \
+              libncurses-dev \
+              libssl-dev \
+              pkg-config \
+              python3 \
+              rsync \
+              dwarves \
+              gcc-aarch64-linux-gnu
 
       - name: Show kernel version
         run: |
