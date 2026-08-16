@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-26.04-arm
-    timeout-minutes: 90
+    timeout-minutes: 240
 
     steps:
       - name: Checkout kernel repository
