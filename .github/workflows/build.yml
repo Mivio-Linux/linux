@@ -27,6 +27,9 @@ jobs:
               libdw-dev \
               libelf-dev \
               libncurses-dev \
+              rustc \
+              cargo \
+              bindgen \
               libssl-dev \
               pkg-config \
               python3 \
