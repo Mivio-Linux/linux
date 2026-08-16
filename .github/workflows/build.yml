@@ -15,46 +15,104 @@ jobs:
       - name: Checkout kernel repository
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------------
+      # Dependencies
+      # ------------------------------------------------------------
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-              bc \
-              bison \
-              build-essential \
-              debhelper-compat \
-              flex \
-              libdw-dev \
-              libelf-dev \
-              libncurses-dev \
-              rustc \
-              cargo \
-              bindgen \
-              libssl-dev \
-              pkg-config \
-              python3 \
-              rsync \
-              dwarves \
-              gcc-aarch64-linux-gnu
 
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            debhelper-compat \
+            flex \
+            libdw-dev \
+            libelf-dev \
+            libncurses-dev \
+            libssl-dev \
+            pkg-config \
+            python3 \
+            rsync \
+            dwarves \
+            pahole
+
+      # ------------------------------------------------------------
+      # Rust
+      #
+      # IMPORTANT:
+      # Do not use Ubuntu's rustc/cargo packages here.
+      # The runner already provides rustup.
+      #
+      # rust-src is required by the Linux kernel Rust build.
+      # ------------------------------------------------------------
+      - name: Setup Rust
+        run: |
+          rustup toolchain install stable
+          rustup default stable
+          rustup component add rust-src
+
+          echo "=== Rust ==="
+          rustc --version
+          cargo --version
+          rustup show
+
+          echo
+          echo "=== Rust source ==="
+          RUST_SYSROOT="$(rustc --print sysroot)"
+          RUST_SRC="$RUST_SYSROOT/lib/rustlib/src/rust/library"
+
+          echo "RUST_SYSROOT=$RUST_SYSROOT"
+          echo "RUST_SRC=$RUST_SRC"
+
+          test -f "$RUST_SRC/core/src/lib.rs"
+
+          echo "RUST_SRC_PATH=$RUST_SRC" >> "$GITHUB_ENV"
+
+      # ------------------------------------------------------------
+      # Kernel information
+      # ------------------------------------------------------------
       - name: Show kernel version
         run: |
           make -s kernelversion
 
-      - name: Install Ubuntu Asahi config
+      # ------------------------------------------------------------
+      # Use the old Asahi configuration
+      #
+      # This file is kept in:
+      #
+      # config/config-7.0.0-1002-asahi-arm
+      # ------------------------------------------------------------
+      - name: Install Asahi kernel config
         run: |
           test -f config/config-7.0.0-1002-asahi-arm
+
           cp config/config-7.0.0-1002-asahi-arm .config
 
-      - name: Update config for this kernel
+          echo "Using:"
+          echo "config/config-7.0.0-1002-asahi-arm"
+
+      # ------------------------------------------------------------
+      # Update old config for the current kernel
+      # ------------------------------------------------------------
+      - name: Update kernel config
         run: |
           make olddefconfig
 
-      - name: Show kernel configuration
+      # ------------------------------------------------------------
+      # Verify important configuration
+      # ------------------------------------------------------------
+      - name: Verify kernel configuration
         run: |
           echo "=== Architecture ==="
           grep '^CONFIG_ARM64=' .config || true
           grep '^CONFIG_ARM64_16K_PAGES=' .config || true
+
+          echo
+          echo "=== Rust ==="
+          grep '^CONFIG_RUST=' .config || true
+          grep '^CONFIG_RUST_IS_AVAILABLE=' .config || true
 
           echo
           echo "=== Apple / Asahi ==="
@@ -62,30 +120,56 @@ jobs:
             '^(CONFIG_.*(APPLE|ASAHI|AGX|DART|NVME_APPLE|USB.*APPLE|I2C_APPLE|SPI_APPLE|PINCTRL_APPLE|SND_.*APPLE))=' \
             .config || true
 
+      # ------------------------------------------------------------
+      # Check Rust support before starting the long build
+      # ------------------------------------------------------------
+      - name: Check Rust support
+        run: |
+          make rustavailable
+
+      # ------------------------------------------------------------
+      # Save final generated config
+      # ------------------------------------------------------------
       - name: Save generated config
         run: |
           mkdir -p artifacts
           cp .config artifacts/config-generated
 
+      # ------------------------------------------------------------
+      # Build Debian packages
+      # ------------------------------------------------------------
       - name: Build Debian packages
         run: |
           make -j"$(nproc)" bindeb-pkg \
             KDEB_PKGVERSION="$(make -s kernelversion)-asahi-custom.${GITHUB_RUN_NUMBER}"
 
+      # ------------------------------------------------------------
+      # Collect generated Debian packages
+      # ------------------------------------------------------------
       - name: Collect packages
         run: |
+          echo "=== Parent directory ==="
+          ls -lah ..
+
           cp -v ../*.deb artifacts/
 
+          echo
           echo "=== Built packages ==="
           ls -lh artifacts/
 
-      - name: Upload artifacts
+      # ------------------------------------------------------------
+      # Upload artifacts
+      # ------------------------------------------------------------
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asahi-kernel-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: error
 
+      # ------------------------------------------------------------
+      # GitHub Release
+      # ------------------------------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
