@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-26.04-arm
-    timeout-minutes: 240
+    timeout-minutes: 360
 
     steps:
       - name: Checkout kernel repository
@@ -139,9 +139,12 @@ jobs:
       # ------------------------------------------------------------
       # Build Debian packages
       # ------------------------------------------------------------
-      - name: Build Debian packages
+      - name: Build Kernel
         run: |
-          make -j"$(nproc)" bindeb-pkg \
+          make -j"$(nproc)"
+      - name: Build Debian Packages
+        run: |
+          make -j1  bindeb-pkg \
             KDEB_PKGVERSION="$(make -s kernelversion)-asahi-custom.${GITHUB_RUN_NUMBER}"
 
       # ------------------------------------------------------------
