@@ -1,0 +1,107 @@
+name: Build Asahi Linux kernel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  KERNEL_REPO: https://github.com/AsahiLinux/linux.git
+  KERNEL_REF: asahi
+  CONFIG_FILE: config/config-7.0.0-1002-asahi-arm
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout kernel config repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            flex \
+            git \
+            libdw-dev \
+            libelf-dev \
+            libncurses-dev \
+            libssl-dev \
+            pkg-config \
+            python3 \
+            rsync \
+            dwarves
+
+      - name: Clone Asahi kernel
+        run: |
+          git clone \
+            --depth=1 \
+            --branch "${KERNEL_REF}" \
+            "${KERNEL_REPO}" \
+            linux
+
+      - name: Show kernel version
+        working-directory: linux
+        run: |
+          echo "Kernel version:"
+          make -s kernelversion
+
+      - name: Install kernel config
+        working-directory: linux
+        run: |
+          test -f "../${CONFIG_FILE}"
+          cp "../${CONFIG_FILE}" .config
+
+      - name: Update config for kernel version
+        working-directory: linux
+        run: |
+          make olddefconfig
+
+      - name: Save generated config
+        run: |
+          mkdir -p artifacts
+          cp linux/.config artifacts/config-generated
+
+      - name: Show Apple / Asahi configuration
+        working-directory: linux
+        run: |
+          echo "=== Apple / Asahi CONFIG options ==="
+          grep -Ei \
+            '^(CONFIG_.*(APPLE|ASAHI|AGX|DART|NVME_APPLE|USB.*APPLE|I2C_APPLE|SPI_APPLE|PINCTRL_APPLE|SND_.*APPLE))=' \
+            .config || true
+
+      - name: Build Debian packages
+        working-directory: linux
+        run: |
+          make -j"$(nproc)" bindeb-pkg \
+            KDEB_PKGVERSION="$(make -s kernelversion)-asahi-custom.${GITHUB_RUN_NUMBER}"
+
+      - name: Collect Debian packages
+        run: |
+          cp -v ./*.deb artifacts/
+
+          echo "=== Built packages ==="
+          ls -lh artifacts/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: asahi-kernel
+          path: artifacts/
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "kernel-${{ github.run_number }}"
+          name: "Asahi kernel build ${{ github.run_number }}"
+          generate_release_notes: true
+          files: |
+            artifacts/*.deb
+            artifacts/config-generated
