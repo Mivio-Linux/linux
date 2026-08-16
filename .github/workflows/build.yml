@@ -30,6 +30,7 @@ jobs:
             flex \
             libdw-dev \
             libelf-dev \
+            bindgen \
             libncurses-dev \
             libssl-dev \
             pkg-config \
