@@ -87,12 +87,12 @@ jobs:
       # ------------------------------------------------------------
       - name: Install Asahi kernel config
         run: |
-          test -f config/config-7.0.0-1002-asahi-arm
+          test -f config/config-7_1.6_minimal
 
-          cp config/config-7.0.0-1002-asahi-arm .config
+          cp config/config-7_1.6_minimal .config
 
           echo "Using:"
-          echo "config/config-7.0.0-1002-asahi-arm"
+          echo "config/config-7_1.6_minimal"
 
       # ------------------------------------------------------------
       # Update old config for the current kernel
