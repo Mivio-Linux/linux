@@ -162,24 +162,26 @@ jobs:
       - name: Collect packages
         run: |
           echo "=== RPM build directory ==="
-          ls -lah ~/rpmbuild/RPMS/aarch64/ || true
-
-          cp -v ~/rpmbuild/RPMS/aarch64/*.rpm artifacts/
-
+          ls -lah ${{ github.workspace }}/rpmbuild/RPMS/aarch64/ || true
+      
+          mkdir -p artifacts
+          cp -v ${{ github.workspace }}/rpmbuild/RPMS/aarch64/*.rpm artifacts/ || echo "Trying alternate path..."
+          
+          # Если первый путь не сработал, пробуем найти
+          if [ ! -f artifacts/*.rpm ]; then
+            find . -name "*.rpm" -type f -exec cp {} artifacts/ \;
+          fi
+      
           echo
-          echo "=== Built packages ==="
+          echo "=== Collected packages ==="
           ls -lh artifacts/
-
-      # ------------------------------------------------------------
-      # Upload artifacts
-      # ------------------------------------------------------------
+      
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: asahi-kernel-${{ github.run_number }}
           path: artifacts/
           if-no-files-found: error
-
       # ------------------------------------------------------------
       # GitHub Release
       # ------------------------------------------------------------
